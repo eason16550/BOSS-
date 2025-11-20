@@ -1,3 +1,14 @@
+
+/**
+ * 頭目資料設定檔
+ * 
+ * 若要新增或修改頭目，請依照下列格式編輯：
+ * { name: "顯示名稱", durationMinutes: 分鐘數, aliases: ["別名1", "別名2"] },
+ * 
+ * 例如新增一個「測試王」，2小時重生，別名叫「T1」：
+ * { name: "測試王", durationMinutes: 120, aliases: ["T1"] },
+ */
+
 export const BOSS_DATA = [
     { name: "四色", durationMinutes: 120, aliases: ["4"] },
     { name: "小紅", durationMinutes: 120, aliases: ["紅", "R"] },

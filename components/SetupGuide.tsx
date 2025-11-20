@@ -104,6 +104,7 @@ trap "echo '正在關閉背景伺服器...'; kill $SERVER_PID" EXIT
 
                 <h3 className="text-lg font-semibold text-cyan-300 mt-4 mb-2">3. 設定 Webhook</h3>
                 <p className="text-gray-300 mb-4">複製終端機顯示的 Cloudflare 網址 (https://...trycloudflare.com)，加上 `/webhook` 後，貼到 LINE Console 的 Webhook URL 欄位並啟用。</p>
+                <p className="text-red-400 font-bold mt-2">⚠️ 注意：如果您使用此方式，必須保持 Cloudflare 視窗開啟。如果關閉，LINE 就會斷線。</p>
             </div>
 
             <div className="mt-12 pt-8 border-t-2 border-gray-600">
@@ -112,30 +113,54 @@ trap "echo '正在關閉背景伺服器...'; kill $SERVER_PID" EXIT
                 </h2>
                 <p className="text-gray-300 mb-6">
                     這就是讓 Bot 24 小時運作的方法。我們將程式碼放到免費的雲端平台 <strong>Render.com</strong> 上。
+                    <br/><span className="text-yellow-300 text-sm">注意：使用雲端部署時，您「不需要」執行上述的 Cloudflare 或本機腳本。</span>
                 </p>
 
-                <div className="bg-gray-900/50 p-6 rounded-lg border border-purple-500/30">
-                    <h3 className="text-lg font-bold text-purple-300 mb-4">Render 部署與更新步驟：</h3>
-                    <ol className="list-decimal list-inside text-gray-300 space-y-4">
-                        <li>
-                            <strong className="text-white">初次部署：</strong>
-                            <div className="pl-6 mt-1 text-sm text-gray-400">
-                                將程式碼上傳至 GitHub。在 Render 新增 Web Service 連結 GitHub。設定環境變數 (LINE 金鑰)。設定 LINE Webhook。
-                            </div>
-                        </li>
-                        <li>
-                            <strong className="text-yellow-300">如何更新程式碼？</strong>
-                            <div className="pl-6 mt-1 text-sm text-gray-400">
-                                當您在電腦上修改了 Bot 的功能後 (例如本網頁幫您產生的新程式碼)，您只需要：
-                                <ul className="list-disc list-inside mt-2 text-cyan-200">
-                                    <li>將新檔案覆蓋舊檔案。</li>
-                                    <li>使用 Git 提交變更 (Commit)。</li>
-                                    <li>推送到 GitHub (Push)。</li>
-                                </ul>
-                                <p className="mt-2">Render 會自動偵測到 GitHub 的變更，並在幾分鐘內自動重新部署您的新版 Bot，您不需要在 Render 上做任何操作！</p>
-                            </div>
-                        </li>
-                    </ol>
+                <div className="bg-gray-900/50 p-6 rounded-lg border border-purple-500/30 space-y-8">
+                    <div>
+                        <h3 className="text-lg font-bold text-purple-300 mb-4">1. Render 部署與更新步驟：</h3>
+                        <ol className="list-decimal list-inside text-gray-300 space-y-4">
+                            <li>
+                                <strong className="text-white">初次部署：</strong>
+                                <div className="pl-6 mt-1 text-sm text-gray-400">
+                                    將程式碼上傳至 GitHub。在 Render 新增 Web Service 連結 GitHub。設定環境變數 (LINE 金鑰)。設定 LINE Webhook (使用 Render 提供的網址，記得加上 /webhook)。
+                                </div>
+                            </li>
+                            <li>
+                                <strong className="text-white">更新程式碼：</strong>
+                                <div className="pl-6 mt-1 text-sm text-gray-400">
+                                    當您在電腦上修改了 Bot 的功能 (例如調整了 `bot-constants.js`) 後：
+                                    <ul className="list-disc list-inside mt-2 text-cyan-200">
+                                        <li>將新檔案存檔。</li>
+                                        <li>使用 Git 提交變更 (Commit)。</li>
+                                        <li>推送到 GitHub (Push)。</li>
+                                    </ul>
+                                    <p className="mt-2">Render 會自動偵測到 GitHub 的變更，並在幾分鐘內自動重新部署您的新版 Bot。</p>
+                                </div>
+                            </li>
+                        </ol>
+                    </div>
+
+                    <div className="border-t border-gray-700 pt-6">
+                        <h3 className="text-lg font-bold text-red-300 mb-4">2. ⚠️ 解決免費版「休眠延遲」問題 (必做)</h3>
+                        <p className="text-gray-300 mb-4">
+                            Render 免費版在 15 分鐘沒人用時會自動「睡著」，這會導致 LINE 第一次回應要等 50 秒 (顯示錯誤)。<br/>
+                            <strong>解決方法：使用免費的監控服務每 10 分鐘戳它一下。</strong>
+                        </p>
+                        <ol className="list-decimal list-inside text-gray-300 space-y-3">
+                            <li>註冊 <a href="https://uptimerobot.com/" target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:underline">UptimeRobot (免費)</a>。</li>
+                            <li>點擊 <strong>Add New Monitor</strong>。</li>
+                            <li>Monitor Type 選擇 <strong>HTTP(s)</strong>。</li>
+                            <li>Friendly Name 隨便填 (例如 MyBot)。</li>
+                            <li>
+                                <strong>URL (or IP):</strong> 填入您 Render 的網址 (例如 `https://xxxx.onrender.com`)。
+                                <br/> <span className="text-sm text-gray-500 ml-6">注意：不要加 /webhook，只要首頁網址就好。</span>
+                            </li>
+                            <li>Monitoring Interval 設為 <strong>10 minutes</strong> (或 5 分鐘)。</li>
+                            <li>點擊 Create Monitor。</li>
+                        </ol>
+                        <p className="text-green-400 mt-4 font-semibold">✅ 完成！現在您的 Bot 即使沒人講話，也會一直保持清醒，隨時秒回！</p>
+                    </div>
                 </div>
             </div>
         </div>

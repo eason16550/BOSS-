@@ -123,6 +123,12 @@ async function handleEvent(event) {
   return Promise.resolve(null);
 }
 
+// --- Root Route for Keep-Alive Pings ---
+// This allows services like UptimeRobot to ping the server to prevent it from sleeping.
+app.get('/', (req, res) => {
+    res.send('Gemini LINE Bot is awake and running!');
+});
+
 // --- Express Route ---
 app.post('/webhook', line.middleware(config), (req, res) => {
   console.log("Webhook 驗證成功，正在處理傳入的事件...");

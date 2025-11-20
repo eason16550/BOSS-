@@ -3,7 +3,9 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import type { Message } from './types';
 import { Role } from './types';
 import { getChatResponse } from './services/geminiService';
-import { BOSS_DATA } from './constants';
+// FIX: Import from bot-constants.js to share data with server.js.
+// @ts-ignore
+import { BOSS_DATA } from './bot-constants.js';
 import ChatInput from './components/ChatInput';
 import ChatMessage from './components/ChatMessage';
 import LoadingSpinner from './components/LoadingSpinner';
@@ -52,7 +54,7 @@ const App: React.FC = () => {
         return;
     }
 
-    const allNamesAndAliases = BOSS_DATA.flatMap(b => [b.name, ...b.aliases]);
+    const allNamesAndAliases = BOSS_DATA.flatMap((b: any) => [b.name, ...b.aliases]);
     const deathTimeRegex = new RegExp(`(${allNamesAndAliases.join('|')})\\s*(\\d{6})`);
     const killRegex = /^[Kk]\s+(.+)/;
 
@@ -70,9 +72,9 @@ const App: React.FC = () => {
     // Logic to resolve name and update state
     const updateState = (inputName: string, time: string) => {
         const aliasToNameMap = new Map<string, string>();
-        BOSS_DATA.forEach(boss => {
+        BOSS_DATA.forEach((boss: any) => {
             aliasToNameMap.set(boss.name, boss.name);
-            boss.aliases.forEach(alias => {
+            boss.aliases.forEach((alias: string) => {
                 aliasToNameMap.set(alias, boss.name);
             });
         });
