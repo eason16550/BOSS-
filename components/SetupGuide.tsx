@@ -12,16 +12,12 @@ const CodeBlock: React.FC<CodeBlockProps> = ({ children }) => (
     </pre>
 );
 
-// FIX: Removed hardcoded userLineKeys to prevent usage of invalid credentials and improve security.
-// The user will now be instructed to fill in their own keys in the script.
-
 // FIX: Removed props as API key is no longer managed via UI state.
 interface SetupGuideProps {}
 
 const SetupGuide: React.FC<SetupGuideProps> = () => {
     const [os, setOs] = React.useState('windows');
 
-    // FIX: Updated scripts to use API_KEY and placeholders for all required user-specific keys.
     const windowsScript = `@echo off
 echo "正在設定您的專屬金鑰..."
 set LINE_CHANNEL_SECRET="在此貼上您的_LINE_CHANNEL_SECRET"
@@ -43,7 +39,6 @@ echo " "
 node server.js
 `;
 
-    // FIX: Updated scripts to use API_KEY and placeholders for all required user-specific keys.
     const macScript = `#!/bin/bash
 echo "正在設定您的專屬金鑰..."
 export LINE_CHANNEL_SECRET="在此貼上您的_LINE_CHANNEL_SECRET"
@@ -116,58 +111,32 @@ trap "echo '正在關閉背景伺服器...'; kill $SERVER_PID" EXIT
                     <span className="mr-2">☁️</span> 方式二：雲端部署 (推薦，不用開電腦)
                 </h2>
                 <p className="text-gray-300 mb-6">
-                    如果您希望 Bot 能夠 24 小時運作，且不佔用您的個人電腦資源，您可以將程式碼部署到雲端平台。
-                    推薦使用 <strong>Render.com</strong> (有免費方案) 或 <strong>Railway</strong>。
+                    這就是讓 Bot 24 小時運作的方法。我們將程式碼放到免費的雲端平台 <strong>Render.com</strong> 上。
                 </p>
 
                 <div className="bg-gray-900/50 p-6 rounded-lg border border-purple-500/30">
-                    <h3 className="text-lg font-bold text-purple-300 mb-4">部署步驟 (以 Render 為例)：</h3>
+                    <h3 className="text-lg font-bold text-purple-300 mb-4">Render 部署與更新步驟：</h3>
                     <ol className="list-decimal list-inside text-gray-300 space-y-4">
                         <li>
-                            <strong className="text-white">上傳程式碼到 GitHub：</strong>
+                            <strong className="text-white">初次部署：</strong>
                             <div className="pl-6 mt-1 text-sm text-gray-400">
-                                將您的專案檔案 (包含 server.js, package.json 等) 上傳到一個 GitHub Repository。
+                                將程式碼上傳至 GitHub。在 Render 新增 Web Service 連結 GitHub。設定環境變數 (LINE 金鑰)。設定 LINE Webhook。
                             </div>
                         </li>
                         <li>
-                            <strong className="text-white">註冊 Render 並建立 Web Service：</strong>
+                            <strong className="text-yellow-300">如何更新程式碼？</strong>
                             <div className="pl-6 mt-1 text-sm text-gray-400">
-                                前往 Render.com，選擇 "New Web Service"，並連結您的 GitHub Repository。
-                            </div>
-                        </li>
-                        <li>
-                            <strong className="text-white">設定環境變數 (Environment Variables)：</strong>
-                            <div className="pl-6 mt-1 text-sm text-gray-400">
-                                在 Render 的設定頁面中，找到 Environment 區塊，新增以下三個變數：
-                                <ul className="list-disc list-inside mt-2 text-purple-200 font-mono">
-                                    <li>API_KEY: 您的 Google Gemini Key</li>
-                                    <li>LINE_CHANNEL_SECRET: 您的 LINE Channel Secret</li>
-                                    <li>LINE_CHANNEL_ACCESS_TOKEN: 您的 LINE Token</li>
+                                當您在電腦上修改了 Bot 的功能後 (例如本網頁幫您產生的新程式碼)，您只需要：
+                                <ul className="list-disc list-inside mt-2 text-cyan-200">
+                                    <li>將新檔案覆蓋舊檔案。</li>
+                                    <li>使用 Git 提交變更 (Commit)。</li>
+                                    <li>推送到 GitHub (Push)。</li>
                                 </ul>
-                            </div>
-                        </li>
-                        <li>
-                            <strong className="text-white">取得網址並設定 LINE Webhook：</strong>
-                            <div className="pl-6 mt-1 text-sm text-gray-400">
-                                部署完成後，Render 會給您一個網址 (例如 `https://xxx.onrender.com`)。
-                                將此網址加上 `/webhook` (即 `https://xxx.onrender.com/webhook`)，填入 LINE Developers Console 即可。
+                                <p className="mt-2">Render 會自動偵測到 GitHub 的變更，並在幾分鐘內自動重新部署您的新版 Bot，您不需要在 Render 上做任何操作！</p>
                             </div>
                         </li>
                     </ol>
-                    <div className="mt-6 bg-purple-900/20 p-3 rounded text-sm text-purple-200 border border-purple-500/20">
-                        💡 提示：雲端部署後，您就不需要再執行本機的 `start.bat` 或 Cloudflare 了！
-                    </div>
                 </div>
-            </div>
-
-            <div className="mt-8 pt-6 border-t border-gray-700">
-                <h2 className="text-xl font-semibold text-teal-300 mb-3">最後檢查：LINE 官方帳號設定</h2>
-                <p className="text-gray-300 mb-4">無論是用本機還是雲端，請務必記得調整 LINE 後台設定，以免出現自動回覆干擾。</p>
-                <ul className="list-disc list-inside text-gray-400 space-y-2 pl-4">
-                    <li>Response mode 改為 <strong>"Bot"</strong></li>
-                    <li>Webhook 設為 <strong>"Enabled"</strong></li>
-                    <li>Auto-response messages 設為 <strong>"Disabled"</strong></li>
-                </ul>
             </div>
         </div>
     );

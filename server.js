@@ -4,7 +4,7 @@ import 'dotenv/config'; // Load environment variables from .env file
 import express from 'express';
 import line from '@line/bot-sdk';
 import { BOSS_DATA } from './bot-constants.js';
-import { processUserCommand } from './logic/bossLogic.js';
+import { processUserCommand, getTaipeiTimeHHMMSS } from './logic/bossLogic.js';
 
 // --- Helper function to clean keys ---
 const cleanKey = (key) => {
@@ -90,14 +90,12 @@ async function handleEvent(event) {
       const inputName = killMatch[1].trim();
       const canonicalName = aliasToNameMap.get(inputName);
       if (canonicalName) {
-          const now = new Date();
-          const hours = String(now.getHours()).padStart(2, '0');
-          const minutes = String(now.getMinutes()).padStart(2, '0');
-          const seconds = String(now.getSeconds()).padStart(2, '0');
-          const time = `${hours}${minutes}${seconds}`;
+          // FIX: Use the helper from bossLogic to get Taiwan Time (UTC+8)
+          // Cloud servers (like Render) are usually UTC, so new Date() gives the wrong time for our users.
+          const time = getTaipeiTimeHHMMSS();
           
           bossDeathTimes[canonicalName] = time;
-          console.log(`Updated death time for ${canonicalName} to ${time} (via K command)`);
+          console.log(`Updated death time for ${canonicalName} to ${time} (Taiwan Time)`);
       }
   } else if (deathTimeMatch) {
       const inputName = deathTimeMatch[2];

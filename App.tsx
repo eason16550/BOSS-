@@ -91,6 +91,8 @@ const App: React.FC = () => {
     } else if (isKillCommand) {
         const match = trimmedText.match(killRegex);
         if (match) {
+            // For Frontend simulation, we use the user's browser time.
+            // Note: The actual LINE Bot on Render will use the timezone corrected logic in server.js.
             const now = new Date();
             const hours = String(now.getHours()).padStart(2, '0');
             const minutes = String(now.getMinutes()).padStart(2, '0');

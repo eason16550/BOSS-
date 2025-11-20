@@ -2,24 +2,37 @@
 // This new file contains all the core logic for the boss timer bot.
 // It replaces the need for the Gemini API, making the bot faster, more reliable, and free to operate.
 
-// FIX: Switched to ES Module syntax to be compatible with both frontend and the updated backend.
 import { BOSS_DATA } from '../bot-constants.js';
 
-// --- Helper Functions for Time Calculation ---
+// --- Timezone Helper Functions ---
 
 /**
- * Parses a HHMMSS time string into a Date object.
- * It intelligently handles cases where the time belongs to the previous day (e.g., it's 1 AM, and the death time was 11 PM).
+ * Returns a Date object representing the current time in Taipei (UTC+8).
+ * Since we cannot change the system timezone of the cloud server, we create a Date
+ * object shifted by the offset difference.
+ * @returns {Date}
+ */
+function getTaipeiNow() {
+    const now = new Date();
+    // 1. Get current UTC time in ms
+    const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+    // 2. Add 8 hours for Taipei
+    const taipeiOffset = 8 * 60 * 60 * 1000;
+    return new Date(utc + taipeiOffset);
+}
+
+/**
+ * Parses a HHMMSS time string into a Date object (treated as Taipei Time).
  * @param {string} timeStr - The time string in HHMMSS format.
- * @param {Date} now - The current time, used as a reference.
- * @returns {Date} A Date object representing the correct death time.
+ * @param {Date} now - The current Taipei time (shifted Date object).
+ * @returns {Date} A Date object representing the death time (shifted to Taipei Time).
  */
 function parseTime(timeStr, now) {
     const hours = parseInt(timeStr.substring(0, 2), 10);
     const minutes = parseInt(timeStr.substring(2, 4), 10);
     const seconds = parseInt(timeStr.substring(4, 6), 10);
     
-    // Start with a copy of the current date and time
+    // Start with a copy of the current Taipei time
     const deathDate = new Date(now.getTime());
     // Set the time from the user input
     deathDate.setHours(hours, minutes, seconds, 0);
@@ -36,7 +49,8 @@ function parseTime(timeStr, now) {
 
 /**
  * Formats a Date object into a YYYY-MM-DD HH:MM:SS string.
- * @param {Date} date - The date to format.
+ * Note: The input date is expected to be already shifted to Taipei Time.
+ * @param {Date} date - The shifted date to format.
  * @returns {string} The formatted date string.
  */
 function formatDateTime(date) {
@@ -50,10 +64,10 @@ function formatDateTime(date) {
 }
 
 /**
- * Calculates the next spawn time for a given boss and how many spawns were missed.
- * @param {Date} deathTime - The Date object of the boss's death.
+ * Calculates the next spawn time.
+ * @param {Date} deathTime - The death time (shifted to Taipei Time).
  * @param {number} durationMinutes - The respawn duration in minutes.
- * @param {Date} now - The current time.
+ * @param {Date} now - The current time (shifted to Taipei Time).
  * @returns {{nextSpawnTime: Date, missedCount: number}}
  */
 function calculateNextSpawn(deathTime, durationMinutes, now) {
@@ -74,11 +88,11 @@ function calculateNextSpawn(deathTime, durationMinutes, now) {
 }
 
 /**
- * Gets the current time as a HHMMSS string.
+ * Gets the current Taipei time as a HHMMSS string.
  * @returns {string}
  */
-function getCurrentTimeHHMMSS() {
-    const now = new Date();
+export function getTaipeiTimeHHMMSS() {
+    const now = getTaipeiNow();
     const hours = String(now.getHours()).padStart(2, '0');
     const minutes = String(now.getMinutes()).padStart(2, '0');
     const seconds = String(now.getSeconds()).padStart(2, '0');
@@ -108,14 +122,14 @@ function handleListUpcomingSpawns(deathTimes) {
         return "尚無任何頭目死亡紀錄可供排序。";
     }
 
-    const now = new Date();
+    const now = getTaipeiNow();
     const upcomingSpawns = [];
 
     for (const bossName in deathTimes) {
         const deathTimeStr = deathTimes[bossName];
         const bossInfo = BOSS_DATA.find(b => b.name === bossName);
         if (bossInfo) {
-            const deathTime = parseTime(deathTimeStr, now); // Pass 'now' for correct date calculation
+            const deathTime = parseTime(deathTimeStr, now); 
             const { nextSpawnTime, missedCount } = calculateNextSpawn(deathTime, bossInfo.durationMinutes, now);
             
             const missedText = missedCount > 0 ? ` (已錯過 ${missedCount} 次)` : '';
@@ -135,7 +149,7 @@ function handleListUpcomingSpawns(deathTimes) {
         `${formatDateTime(spawn.spawnTime)} - ${spawn.bossName}${spawn.missedText}`
     ).join('\n');
 
-    return `下次頭目重生排序：\n${spawnList}`;
+    return `下次頭目重生排序 (台灣時間)：\n${spawnList}`;
 }
 
 /**
@@ -149,8 +163,8 @@ function handleBossDeathTime(bossName, deathTimeStr) {
         return `錯誤：找不到頭目 ${bossName}。`;
     }
 
-    const now = new Date();
-    const deathTime = parseTime(deathTimeStr, now); // Pass 'now' for correct date calculation
+    const now = getTaipeiNow();
+    const deathTime = parseTime(deathTimeStr, now);
     const { nextSpawnTime, missedCount } = calculateNextSpawn(deathTime, bossInfo.durationMinutes, now);
     
     const missedText = missedCount > 0 ? ` (已錯過 ${missedCount} 次)` : '';
@@ -164,7 +178,6 @@ function handleBossDeathTime(bossName, deathTimeStr) {
  * @param {Record<string, string>} deathTimes - The current state of death times.
  * @returns {string | null} The response text, or null if the command is not recognized.
  */
-// FIX: Export the function to make it available for ES Module imports.
 export function processUserCommand(userMessage, deathTimes) {
     const trimmedMessage = userMessage.trim();
 
@@ -181,7 +194,9 @@ export function processUserCommand(userMessage, deathTimes) {
     }
 
     // Intent 5: Current time death record ("K <boss>")
-    // Check this BEFORE standard death time regex to avoid overlap if regexes are similar
+    // The logic is handled in two parts:
+    // 1. The caller (server/UI) identifies the command and updates the state with the CURRENT time.
+    // 2. This function here just needs to display the confirmation.
     const killRegex = /^[Kk]\s+(.+)/;
     const killMatch = trimmedMessage.match(killRegex);
 
@@ -198,13 +213,20 @@ export function processUserCommand(userMessage, deathTimes) {
         const canonicalName = aliasToNameMap.get(inputName);
         
         if (canonicalName) {
-            // For the response message, we use the current time as if the user typed it.
-            const timeStr = getCurrentTimeHHMMSS();
-            return handleBossDeathTime(canonicalName, timeStr);
+            const recordedTime = deathTimes[canonicalName];
+            
+            if (recordedTime) {
+                // If state was updated correctly, show the calculation
+                return handleBossDeathTime(canonicalName, recordedTime);
+            } else {
+                 // Fallback: If for some reason state wasn't updated, use current Taipei time
+                 const nowStr = getTaipeiTimeHHMMSS();
+                 return handleBossDeathTime(canonicalName, nowStr);
+            }
         }
     }
 
-    // --- Intent 3: Boss Death Time Matching ---
+    // --- Intent 3: Boss Death Time Matching ("BossName HHMMSS") ---
     const allNamesAndAliases = BOSS_DATA.flatMap(b => [b.name, ...b.aliases]);
     const deathTimeRegex = new RegExp(`(^|\\s)(${allNamesAndAliases.join('|')})\\s*(\\d{6})($|\\s)`);
     const match = trimmedMessage.match(deathTimeRegex);
