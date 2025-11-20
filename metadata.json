@@ -1,0 +1,5 @@
+{
+  "name": "Gemini AI Chatbot",
+  "description": "An AI-powered chatbot that leverages a predefined schedule to provide time-based calculations and answers user questions using the Gemini API.",
+  "requestFramePermissions": []
+}
