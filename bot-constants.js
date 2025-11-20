@@ -3,7 +3,7 @@ export const BOSS_DATA = [
     { name: "小紅", durationMinutes: 120, aliases: ["紅", "R"] },
     { name: "小綠", durationMinutes: 120, aliases: ["綠", "G"] },
     { name: "守護螞蟻", durationMinutes: 210, aliases: ["螞蟻"] },
-    { name: "巨大蜈蚣", durationMinutes: 120, aliases: ["蟲", "06"] },
+    { name: "巨大蜈蚣", durationMinutes: 120, aliases: ["蟲", "06", "海蟲"] },
     { name: "77左飛龍", durationMinutes: 120, aliases: ["771", "861"] },
     { name: "77右飛龍", durationMinutes: 120, aliases: ["772", "862"] },
     { name: "伊弗利特", durationMinutes: 120, aliases: ["EF", "衣服"] },
@@ -25,6 +25,6 @@ export const BOSS_DATA = [
     { name: "克特", durationMinutes: 600, aliases: [] },
     { name: "賽尼斯的分身", durationMinutes: 180, aliases: ["304"] },
     { name: "貝里斯", durationMinutes: 360, aliases: ["將軍"] },
-    { name: "烏勒庫斯", durationMinutes: 360, aliases: ["23"] },
-    { name: "奈克偌斯", durationMinutes: 240, aliases: ["57"] }
+    { name: "烏勒庫斯", durationMinutes: 360, aliases: ["23", "19"] },
+    { name: "奈克偌斯", durationMinutes: 240, aliases: ["57", "49"] }
 ];
