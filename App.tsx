@@ -3,29 +3,28 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import type { Message } from './types';
 import { Role } from './types';
 import { getChatResponse } from './services/geminiService';
-// FIX: Import from bot-constants.js to share data with server.js.
 // @ts-ignore
 import { BOSS_DATA } from './bot-constants.js';
+// @ts-ignore
+import { analyzeMessage } from './logic/bossLogic.js';
+
 import ChatInput from './components/ChatInput';
 import ChatMessage from './components/ChatMessage';
 import LoadingSpinner from './components/LoadingSpinner';
 import SetupGuide from './components/SetupGuide';
 
 const App: React.FC = () => {
-  // FIX: Removed geminiApiKey state to comply with security guidelines.
-  // The API key should be handled via environment variables, not user input in the frontend.
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [bossDeathTimes, setBossDeathTimes] = useState<Record<string, string>>({});
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    // FIX: Simplified initial message logic. The app now assumes the API key is configured.
     if (messages.length === 0) {
         setMessages([
             {
                 role: Role.MODEL,
-                parts: "金鑰已載入！我是您的頭目計時助理。\n\n您可以輸入 '王', '出', '重置', 或頭目死亡時間 (例如: '死騎 143000')，\n或者直接輸入 'K 死騎' 來記錄現在時間。",
+                parts: "金鑰已載入！我是您的頭目計時助理。\n\n您可以輸入 '王', '出', '重置', '備份', '還原', 或頭目死亡時間 (例如: '死騎 143000')，\n或者直接輸入 'K 死騎' 來記錄現在時間。",
             },
         ]);
     }
@@ -46,71 +45,64 @@ const App: React.FC = () => {
     const userMessage: Message = { role: Role.USER, parts: trimmedText };
     setMessages((prevMessages) => [...prevMessages, userMessage]);
 
-    // Handle '重置' command locally
-    if (trimmedText === '重置') {
-        setBossDeathTimes({});
-        const modelMessage: Message = { role: Role.MODEL, parts: "所有頭目死亡紀錄已清除。" };
-        setMessages((prevMessages) => [...prevMessages, modelMessage]);
+    // Use the shared analyzeMessage function to determine intent
+    const command = analyzeMessage(trimmedText);
+
+    if (!command) {
+        // If command is not recognized, we can either ignore it or let getChatResponse handle it (which returns null/empty)
+        // But we still want to call getChatResponse in case there's some fallback logic, though currently there isn't.
         return;
     }
 
-    const allNamesAndAliases = BOSS_DATA.flatMap((b: any) => [b.name, ...b.aliases]);
-    const deathTimeRegex = new RegExp(`(${allNamesAndAliases.join('|')})\\s*(\\d{6})`);
-    const killRegex = /^[Kk]\s+(.+)/;
-
-    const isDeathTime = deathTimeRegex.test(trimmedText);
-    const isKillCommand = killRegex.test(trimmedText);
-    const isAllowedCommand = ['王', '出'].includes(trimmedText) || isDeathTime || isKillCommand;
-
-    // If it's not an allowed command, do nothing further (ignore)
-    if (!isAllowedCommand) {
-        return;
-    }
-
+    // --- Update State Locally (Simulation) ---
     let updatedDeathTimes = { ...bossDeathTimes };
-    
-    // Logic to resolve name and update state
-    const updateState = (inputName: string, time: string) => {
-        const aliasToNameMap = new Map<string, string>();
-        BOSS_DATA.forEach((boss: any) => {
-            aliasToNameMap.set(boss.name, boss.name);
-            boss.aliases.forEach((alias: string) => {
-                aliasToNameMap.set(alias, boss.name);
-            });
-        });
-        const canonicalName = aliasToNameMap.get(inputName);
-        if (canonicalName) {
-            updatedDeathTimes[canonicalName] = time;
-            setBossDeathTimes(updatedDeathTimes);
-        }
-    };
 
-    if (isDeathTime) {
-        const match = trimmedText.match(deathTimeRegex);
-        if (match) {
-            updateState(match[1], match[2]);
-        }
-    } else if (isKillCommand) {
-        const match = trimmedText.match(killRegex);
-        if (match) {
-            // For Frontend simulation, we use the user's browser time.
-            // Note: The actual LINE Bot on Render will use the timezone corrected logic in server.js.
+    switch (command.type) {
+        case 'RESET':
+            updatedDeathTimes = {};
+            setBossDeathTimes({});
+            break;
+        
+        case 'RESTORE':
+            try {
+                const data = JSON.parse(command.data);
+                if (typeof data === 'object') {
+                    updatedDeathTimes = data;
+                    setBossDeathTimes(data);
+                }
+            } catch (e) {
+                console.error("Restore failed in frontend:", e);
+            }
+            break;
+
+        case 'KILL':
             const now = new Date();
             const hours = String(now.getHours()).padStart(2, '0');
             const minutes = String(now.getMinutes()).padStart(2, '0');
             const seconds = String(now.getSeconds()).padStart(2, '0');
             const currentTimeStr = `${hours}${minutes}${seconds}`;
-            updateState(match[1].trim(), currentTimeStr);
-        }
+            updatedDeathTimes[command.name] = currentTimeStr;
+            setBossDeathTimes(updatedDeathTimes);
+            break;
+
+        case 'DEATH_TIME':
+            updatedDeathTimes[command.name] = command.time;
+            setBossDeathTimes(updatedDeathTimes);
+            break;
+
+        // For LIST_ALL, LIST_UPCOMING, BACKUP no state change needed.
     }
 
     setIsLoading(true);
 
     try {
-      // We pass the *updated* death times to the logic service
+      // Pass the UPDATED state to the logic to generate the text response
       const responseText = await getChatResponse(trimmedText, updatedDeathTimes);
-      const modelMessage: Message = { role: Role.MODEL, parts: responseText };
-      setMessages((prevMessages) => [...prevMessages, modelMessage]);
+      
+      if (responseText) {
+          const modelMessage: Message = { role: Role.MODEL, parts: responseText };
+          setMessages((prevMessages) => [...prevMessages, modelMessage]);
+      }
     } catch (error) {
       console.error(error);
       const errorMessage: Message = {
@@ -156,7 +148,6 @@ const App: React.FC = () => {
 
           <footer className="bg-gray-900/80 backdrop-blur-sm shrink-0">
             <div className="max-w-3xl mx-auto p-4">
-                {/* FIX: Removed isConfigured prop as it's no longer needed. */}
                 <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading} />
             </div>
           </footer>
@@ -164,7 +155,6 @@ const App: React.FC = () => {
 
         {/* Right Column: Setup Guide */}
         <div className="lg:col-span-7 lg:overflow-y-auto p-4 lg:py-8 lg:pr-8">
-            {/* FIX: Removed props from SetupGuide as API key is no longer managed in the UI. */}
             <SetupGuide />
         </div>
       </div>

@@ -159,6 +159,11 @@ trap "echo '正在關閉背景伺服器...'; kill $SERVER_PID" EXIT
                             <li>Monitoring Interval 設為 <strong>10 minutes</strong> (或 5 分鐘)。</li>
                             <li>點擊 Create Monitor。</li>
                         </ol>
+                        <div className="mt-4 p-3 bg-yellow-900/30 border border-yellow-700 rounded text-sm text-yellow-200">
+                            <strong>💡 常見問題：</strong><br/>
+                            如果您看到 UptimeRobot 顯示 "Action Required: Update firewall..." 的紅色警告，<strong>請直接忽略它</strong>。
+                            這是給有設定防火牆的公司看的，Render 預設是公開的，所以不需要做任何設定。只要 Monitor 狀態顯示綠色的 <strong>Up</strong> 即可。
+                        </div>
                         <p className="text-green-400 mt-4 font-semibold">✅ 完成！現在您的 Bot 即使沒人講話，也會一直保持清醒，隨時秒回！</p>
                     </div>
                 </div>

@@ -4,14 +4,12 @@ import 'dotenv/config'; // Load environment variables from .env file
 import express from 'express';
 import line from '@line/bot-sdk';
 import { BOSS_DATA } from './bot-constants.js';
-import { processUserCommand, getTaipeiTimeHHMMSS } from './logic/bossLogic.js';
+import { processUserCommand, getTaipeiTimeHHMMSS, analyzeMessage } from './logic/bossLogic.js';
 
 // --- Helper function to clean keys ---
 const cleanKey = (key) => {
     if (!key) return '';
-    // 1. Trim whitespace from both ends
     let cleaned = key.trim();
-    // 2. If the string starts and ends with a quote, remove them
     if ((cleaned.startsWith('"') && cleaned.endsWith('"')) || (cleaned.startsWith("'") && cleaned.endsWith("'"))) {
         cleaned = cleaned.substring(1, cleaned.length - 1);
     }
@@ -20,7 +18,6 @@ const cleanKey = (key) => {
 
 
 // --- Configuration ---
-// Use environment variables exclusively for configuration.
 const config = {
   channelAccessToken: cleanKey(process.env.LINE_CHANNEL_ACCESS_TOKEN || ""),
   channelSecret: cleanKey(process.env.LINE_CHANNEL_SECRET || ""),
@@ -44,8 +41,7 @@ if (!config.channelSecret || !config.channelAccessToken) {
 
 
 // --- In-memory State ---
-// For a production bot, you would replace this with a database (e.g., Redis, Firestore, etc.)
-const bossDeathTimes = {};
+let bossDeathTimes = {};
 
 // --- LINE Webhook Handler ---
 async function handleEvent(event) {
@@ -55,83 +51,74 @@ async function handleEvent(event) {
 
   const userMessage = event.message.text.trim();
   
-  // Handle '重置' command directly for state management
-  if (userMessage === '重置') {
-      for (const key in bossDeathTimes) {
-          delete bossDeathTimes[key];
-      }
-      console.log('Boss death times have been reset by user command.');
-      const reply = { type: 'text', text: '所有頭目死亡紀錄已清除。' };
-      return client.replyMessage(event.replyToken, reply);
-  }
+  // Use the centralized command analyzer from bossLogic.js
+  // This ensures the Server understands commands EXACTLY the same way as the Response generator.
+  const command = analyzeMessage(userMessage);
 
-  // --- Update State Logic ---
-  
-  // Prepare alias map for name resolution
-  const aliasToNameMap = new Map();
-  BOSS_DATA.forEach(boss => {
-      aliasToNameMap.set(boss.name, boss.name);
-      boss.aliases.forEach(alias => {
-          aliasToNameMap.set(alias, boss.name);
-      });
-  });
+  if (command) {
+      console.log(`Command recognized: ${command.type}`);
+      
+      switch (command.type) {
+          case 'RESET':
+              bossDeathTimes = {};
+              break;
+              
+          case 'BACKUP':
+              // Special handling: we want to return the raw JSON string
+              const backupStr = JSON.stringify(bossDeathTimes);
+              return client.replyMessage(event.replyToken, { type: 'text', text: backupStr });
+              
+          case 'RESTORE':
+              try {
+                  const data = JSON.parse(command.data);
+                  if (typeof data === 'object') {
+                      bossDeathTimes = data;
+                      console.log('Data restored successfully.');
+                  }
+              } catch (e) {
+                  console.error('Restore failed:', e);
+                  return client.replyMessage(event.replyToken, { type: 'text', text: "還原失敗：格式錯誤。" });
+              }
+              break;
 
-  // Check for "K <Boss>" command (Current Time)
-  const killRegex = /^[Kk]\s+(.+)/;
-  const killMatch = userMessage.match(killRegex);
+          case 'KILL':
+              // "K <Boss>" -> Record current Taiwan time
+              const nowTime = getTaipeiTimeHHMMSS();
+              bossDeathTimes[command.name] = nowTime;
+              console.log(`Updated death time for ${command.name} to ${nowTime}`);
+              break;
 
-  // Check for "Boss HHMMSS" command (Custom Time)
-  const allNamesAndAliases = BOSS_DATA.flatMap(b => [b.name, ...b.aliases]);
-  const deathTimeRegex = new RegExp(`(^|\\s)(${allNamesAndAliases.join('|')})\\s*(\\d{6})($|\\s)`);
-  const deathTimeMatch = userMessage.match(deathTimeRegex);
-
-  // Update logic
-  if (killMatch) {
-      const inputName = killMatch[1].trim();
-      const canonicalName = aliasToNameMap.get(inputName);
-      if (canonicalName) {
-          // FIX: Use the helper from bossLogic to get Taiwan Time (UTC+8)
-          // Cloud servers (like Render) are usually UTC, so new Date() gives the wrong time for our users.
-          const time = getTaipeiTimeHHMMSS();
-          
-          bossDeathTimes[canonicalName] = time;
-          console.log(`Updated death time for ${canonicalName} to ${time} (Taiwan Time)`);
-      }
-  } else if (deathTimeMatch) {
-      const inputName = deathTimeMatch[2];
-      const time = deathTimeMatch[3];
-      const canonicalName = aliasToNameMap.get(inputName);
-      if (canonicalName) {
-          bossDeathTimes[canonicalName] = time;
-          console.log(`Updated death time for ${canonicalName} to ${time}`);
+          case 'DEATH_TIME':
+              // "<Boss> <Time>" -> Record specified time
+              bossDeathTimes[command.name] = command.time;
+              console.log(`Updated death time for ${command.name} to ${command.time}`);
+              break;
+              
+          default:
+              // For LIST_ALL, LIST_UPCOMING, etc., no state update is needed.
+              break;
       }
   }
 
-  // --- Get Local Logic Response ---
-  // The processUserCommand handles all recognized commands ('王', '出', death times, K command)
+  // --- Get Response Logic ---
+  // Now that state is definitely updated (if applicable), generate the response.
   const responseText = processUserCommand(userMessage, bossDeathTimes);
 
-  // --- Reply to LINE ---
-  // Only reply if the command was recognized and generated a response.
   if (responseText) {
     const reply = { type: 'text', text: responseText };
     return client.replyMessage(event.replyToken, reply);
   }
 
-  // If the command is not recognized (e.g., random text), do nothing.
-  console.log(`Ignoring unrecognized command: "${userMessage}"`);
   return Promise.resolve(null);
 }
 
 // --- Root Route for Keep-Alive Pings ---
-// This allows services like UptimeRobot to ping the server to prevent it from sleeping.
 app.get('/', (req, res) => {
     res.send('Gemini LINE Bot is awake and running!');
 });
 
 // --- Express Route ---
 app.post('/webhook', line.middleware(config), (req, res) => {
-  console.log("Webhook 驗證成功，正在處理傳入的事件...");
   Promise
     .all(req.body.events.map(handleEvent))
     .then((result) => res.json(result))
@@ -144,5 +131,4 @@ app.post('/webhook', line.middleware(config), (req, res) => {
 // --- Start Server ---
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
-  console.log('Please set up a webhook to this server to connect to LINE.');
 });
