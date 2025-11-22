@@ -133,8 +133,8 @@ export function getTaipeiTimeHHMMSS() {
  * - { type: 'RESET' }
  * - { type: 'BACKUP' }
  * - { type: 'RESTORE', data: string }
- * - { type: 'KILL', name: string }  // "K <name>"
- * - { type: 'DEATH_TIME', name: string, time: string } // "<name> <time>"
+ * - { type: 'KILL', name: string }  // "K <name>" (Current Time)
+ * - { type: 'DEATH_TIME', name: string, time: string } // "<name> <time>" or "K <name> <time>" (Specific Time)
  */
 export function analyzeMessage(message) {
     const trimmed = message.trim();
@@ -169,7 +169,20 @@ export function analyzeMessage(message) {
     const escapedTokens = allTokens.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
     const namePattern = escapedTokens.join('|');
 
-    // 1. Check for Kill Command: "K <Name>" or "k <Name>"
+    // 1. Check for "K <Name> <Time>" (Specific Time with K prefix)
+    // This MUST be checked before "K <Name>" because "K <Name>" is a subset of "K <Name> <Time>"
+    const killTimeRegex = new RegExp(`^[Kk]\\s+(${namePattern})\\s+(\\d{6})$`, 'i');
+    const killTimeMatch = trimmed.match(killTimeRegex);
+    if (killTimeMatch) {
+        const matchedName = killTimeMatch[1];
+        const timeStr = killTimeMatch[2];
+        const canonicalName = aliasToNameMap.get(matchedName);
+        if (canonicalName) {
+            return { type: 'DEATH_TIME', name: canonicalName, time: timeStr };
+        }
+    }
+
+    // 2. Check for "K <Name>" (Current Time)
     const killRegex = new RegExp(`^[Kk]\\s+(${namePattern})$`, 'i');
     const killMatch = trimmed.match(killRegex);
     if (killMatch) {
@@ -180,10 +193,7 @@ export function analyzeMessage(message) {
         }
     }
 
-    // 2. Check for Death Time Command: "<Name> <Time>"
-    // Allows optional spaces. Matches strictly start/end or surrounded by spaces to avoid false positives.
-    // But for a bot, usually the whole message is the command.
-    // Regex: Start + Name + Space(opt) + 6 digits + End
+    // 3. Check for "<Name> <Time>" (Standard Death Time)
     const deathTimeRegex = new RegExp(`^(${namePattern})\\s*(\\d{6})$`, 'i');
     const deathMatch = trimmed.match(deathTimeRegex);
     
